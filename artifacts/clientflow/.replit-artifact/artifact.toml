@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ClientFlow"
+description = "A responsive freelancer workspace for managing clients, projects, and tasks, with a clear dashboard and persistent records."
+version = "1.0.0"
+id = "artifacts/clientflow"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24082
+
+[services.development]
+run = "pnpm --filter @workspace/clientflow run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/clientflow", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/clientflow/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24082"
+BASE_PATH = "/"

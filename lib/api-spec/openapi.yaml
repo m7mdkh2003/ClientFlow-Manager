@@ -3,13 +3,21 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Client, project, and task management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Dashboard summaries
+  - name: clients
+    description: Client management
+  - name: projects
+    description: Project management
+  - name: tasks
+    description: Task tracking
 paths:
   /healthz:
     get:
@@ -24,7 +32,266 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get dashboard overview
+      responses:
+        "200":
+          description: Dashboard totals and task counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /clients:
+    get:
+      operationId: getClients
+      tags: [clients]
+      summary: List clients
+      responses:
+        "200":
+          description: Client records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Create a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInput"
+      responses:
+        "201":
+          description: Created client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /clients/{id}:
+    patch:
+      operationId: updateClient
+      tags: [clients]
+      summary: Update a client
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientUpdate"
+      responses:
+        "200":
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteClient
+      tags: [clients]
+      summary: Delete a client
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Client deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Client still has projects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /projects:
+    get:
+      operationId: getProjects
+      tags: [projects]
+      summary: List projects
+      responses:
+        "200":
+          description: Project records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /projects/{id}:
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Project deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Project still has tasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /tasks:
+    get:
+      operationId: getTasks
+      tags: [tasks]
+      summary: List tasks
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TaskStatus"
+      responses:
+        "200":
+          description: Task records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /tasks/{id}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Task deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Record not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +300,129 @@ components:
           type: string
       required:
         - status
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    Client:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        company: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, company, email, phone, notes, createdAt]
+    ClientInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        company: { type: ["string", "null"] }
+        email: { type: ["string", "null"], format: email }
+        phone: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+      required: [name]
+    ClientUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        company: { type: ["string", "null"] }
+        email: { type: ["string", "null"], format: email }
+        phone: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    ProjectStatus:
+      type: string
+      enum: [planning, active, completed]
+    Project:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        clientId: { type: integer }
+        clientName: { type: string }
+        description: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        deadline: { type: ["string", "null"], format: date }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, clientId, clientName, description, status, deadline, createdAt]
+    ProjectInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        clientId: { type: integer }
+        description: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        deadline: { type: ["string", "null"], format: date }
+      required: [name, clientId]
+    ProjectUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        clientId: { type: integer }
+        description: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        deadline: { type: ["string", "null"], format: date }
+    TaskStatus:
+      type: string
+      enum: [todo, in_progress, done]
+    TaskPriority:
+      type: string
+      enum: [low, medium, high]
+    Task:
+      type: object
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: string }
+        clientName: { type: string }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        priority: { $ref: "#/components/schemas/TaskPriority" }
+        dueDate: { type: ["string", "null"], format: date }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, projectName, clientName, title, description, status, priority, dueDate, createdAt]
+    TaskInput:
+      type: object
+      properties:
+        projectId: { type: integer }
+        title: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        priority: { $ref: "#/components/schemas/TaskPriority" }
+        dueDate: { type: ["string", "null"], format: date }
+      required: [projectId, title]
+    TaskUpdate:
+      type: object
+      properties:
+        projectId: { type: integer }
+        title: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        priority: { $ref: "#/components/schemas/TaskPriority" }
+        dueDate: { type: ["string", "null"], format: date }
+    TaskStatusCounts:
+      type: object
+      properties:
+        todo: { type: integer }
+        in_progress: { type: integer }
+        done: { type: integer }
+      required: [todo, in_progress, done]
+    Dashboard:
+      type: object
+      properties:
+        clientCount: { type: integer }
+        projectCount: { type: integer }
+        activeProjectCount: { type: integer }
+        taskCounts:
+          $ref: "#/components/schemas/TaskStatusCounts"
+        upcomingTasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+      required: [clientCount, projectCount, activeProjectCount, taskCounts, upcomingTasks]
 

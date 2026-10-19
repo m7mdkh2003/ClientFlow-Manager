@@ -1,0 +1,1 @@
+- [ClientFlow product scope](clientflow-product-scope.md) — freelancer workspace for clients, projects, and tasks; keep the MVP task lifecycle focused on To Do, In Progress, and Done.
