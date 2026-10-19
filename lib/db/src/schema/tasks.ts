@@ -1,11 +1,14 @@
 import {
   date,
+  foreignKey,
   integer,
+  index,
   pgEnum,
   pgTable,
   serial,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 import { projectsTable } from "./projects";
 
@@ -23,6 +26,7 @@ export const taskPriorityEnum = pgEnum("task_priority", [
 
 export const tasksTable = pgTable("tasks", {
   id: serial("id").primaryKey(),
+  ownerId: text("owner_id"),
   projectId: integer("project_id")
     .notNull()
     .references(() => projectsTable.id),
@@ -34,7 +38,18 @@ export const tasksTable = pgTable("tasks", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (table) => ({
+  ownerIdIndex: index("tasks_owner_id_idx").on(table.ownerId),
+  ownerIdIdUnique: unique("tasks_owner_id_id_unique").on(
+    table.ownerId,
+    table.id,
+  ),
+  ownerProjectForeignKey: foreignKey({
+    name: "tasks_owner_project_fk",
+    columns: [table.ownerId, table.projectId],
+    foreignColumns: [projectsTable.ownerId, projectsTable.id],
+  }),
+}));
 
 export type Task = typeof tasksTable.$inferSelect;
 export type NewTask = typeof tasksTable.$inferInsert;

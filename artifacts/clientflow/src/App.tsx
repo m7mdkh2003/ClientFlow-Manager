@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRef } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+import { ClerkProvider, Show, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { shadcn } from '@clerk/themes';
+import { Link, Redirect, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { useForm } from 'react-hook-form';
 import {
   Activity, ArrowRight, ArrowUpRight, BriefcaseBusiness, Check,
   CheckCheck, Circle, CircleDashed, Clock3, Command, FileText,
-  LayoutDashboard, Menu, MoreHorizontal, Pencil, Plus, Search, Trash2, Users, X,
+  LayoutDashboard, LogOut, Menu, Pencil, Plus, Search, Trash2, Users, X,
 } from 'lucide-react';
 import {
   getGetClientsQueryKey, getGetDashboardQueryKey, getGetProjectsQueryKey,
@@ -21,6 +25,71 @@ import { Textarea } from '@/components/ui/textarea';
 import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient();
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+function stripBase(path: string) {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || '/'
+    : path;
+}
+
+if (!clerkPubKey) {
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: 'clerk',
+  options: {
+    logoPlacement: 'inside' as const,
+    logoLinkUrl: basePath || '/',
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: '#28483f',
+    colorForeground: '#2b4038',
+    colorMutedForeground: '#79857c',
+    colorDanger: '#b64e44',
+    colorBackground: '#fbf9f2',
+    colorInput: '#f8f5ec',
+    colorInputForeground: '#344840',
+    colorNeutral: '#e2ddcf',
+    fontFamily: 'DM Sans, sans-serif',
+    borderRadius: '0.7rem',
+  },
+  elements: {
+    rootBox: 'w-full flex justify-center',
+    cardBox: 'bg-[#fbf9f2] rounded-2xl w-[440px] max-w-full overflow-hidden',
+    card: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    headerTitle: 'text-[#263c37] font-bold',
+    headerSubtitle: 'text-[#79857c]',
+    socialButtonsBlockButtonText: 'text-[#344840] font-semibold',
+    formFieldLabel: 'text-[#40564b] font-medium',
+    footerActionLink: 'text-[#426c5c] font-semibold',
+    footerActionText: 'text-[#79857c]',
+    dividerText: 'text-[#89938a]',
+    identityPreviewEditButton: 'text-[#426c5c]',
+    formFieldSuccessText: 'text-[#426c5c]',
+    alertText: 'text-[#8b453d]',
+    logoBox: 'rounded-xl',
+    logoImage: 'object-contain',
+    socialButtonsBlockButton: 'border-[#e5dfd2] bg-[#f8f5ec] hover:bg-[#f0ede4]',
+    formButtonPrimary: 'bg-[#28483f] hover:bg-[#355d50] text-[#f7f1e4]',
+    formFieldInput: 'border-[#e2ddcf] bg-[#f8f5ec] text-[#344840]',
+    footerAction: 'text-[#79857c]',
+    dividerLine: 'bg-[#e5dfd2]',
+    alert: 'border-[#ead4cb] bg-[#fbefea]',
+    otpCodeFieldInput: 'border-[#e2ddcf] bg-[#f8f5ec] text-[#344840]',
+    formFieldRow: 'text-[#40564b]',
+    main: 'text-[#2b4038]',
+  },
+};
 type Kind = 'client' | 'project' | 'task';
 type RecordValue = Client | Project | Task;
 type Field = { name: string; label: string; type?: string; required?: boolean; options?: { value: string; label: string }[]; placeholder?: string };
@@ -65,6 +134,8 @@ const fieldSets: Record<Kind, Field[]> = {
 
 function AppContent() {
   const queryClient = useQueryClient();
+  const { signOut } = useClerk();
+  const { user } = useUser();
   const [location] = useLocation();
   const [editor, setEditor] = useState<{ kind: Kind; record?: RecordValue } | null>(null);
   const [search, setSearch] = useState('');
@@ -170,7 +241,11 @@ function AppContent() {
             <p>Good work, in good order.</p>
             <span>Your day, at a glance.</span>
           </div>
-          <div className="profile-strip"><div className="profile-avatar">Y</div><div><strong>Your workspace</strong><span>Independent practice</span></div><MoreHorizontal size={17} /></div>
+          <div className="profile-strip">
+            <div className="profile-avatar">{initials(user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Y')}</div>
+            <div><strong>{user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Your workspace'}</strong><span>Independent practice</span></div>
+            <button className="profile-logout" type="button" aria-label="Log out" title="Log out" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-logout"><LogOut size={16} /></button>
+          </div>
         </div>
       </aside>
       {mobileOpen && <button aria-label="Close menu" className="mobile-scrim" onClick={() => setMobileOpen(false)} data-testid="button-dismiss-navigation" />}
@@ -352,8 +427,117 @@ function EditorModal({ editor, clients, projects, busy, onClose, onSubmit }: {
     </form></Form></section></div>;
 }
 
+function PublicWelcome() {
+  return <main className="public-entry">
+    <header className="public-top">
+      <div className="public-brand"><span className="brand-mark"><Command size={19} strokeWidth={2.4} /></span><span>clientflow<span className="brand-period">.</span></span></div>
+      <div className="public-actions">
+        <Link className="public-signin" href="/sign-in">Sign in</Link>
+        <Link className="public-signup" href="/sign-up">Create your workspace <ArrowRight size={15} /></Link>
+      </div>
+    </header>
+    <section className="public-hero">
+      <div className="public-hero-copy">
+        <span className="public-kicker">A CLEARER KIND OF INDEPENDENT</span>
+        <h1>Good work,<br /><em>in good order.</em></h1>
+        <p>Keep the people, projects, and next steps of your practice close—without making work feel like more work.</p>
+        <div className="public-hero-actions">
+          <Link className="public-primary-cta" href="/sign-up">Start your workspace <ArrowRight size={16} /></Link>
+          <Link className="public-secondary-cta" href="/sign-in">I already have an account</Link>
+        </div>
+        <div className="public-proof"><span className="proof-mark"><Check size={13} /></span><span>A thoughtful home for your independent practice.</span></div>
+      </div>
+      <div className="public-hero-art" aria-hidden="true">
+        <div className="public-orbit orbit-a" /><div className="public-orbit orbit-b" /><div className="public-sun" />
+        <div className="public-card public-card-main"><span>THIS WEEK</span><strong>Make space<br />for the work.</strong><i><span /><span /><span /></i><small>02 projects in motion</small></div>
+        <div className="public-card public-card-note"><span>UP NEXT</span><strong>Send the first<br />round to Mara</strong><small>Today · Brand refresh</small></div>
+        <div className="public-art-plus">+</div><div className="public-art-line" />
+      </div>
+    </section>
+    <footer className="public-footer"><span>CLIENTFLOW <i>·</i> YOUR PRACTICE, IN VIEW</span><span>Built for the work you do on your own.</span></footer>
+  </main>;
+}
+
+function HomeRoute() {
+  return <>
+    <Show when="signed-in"><AppContent /></Show>
+    <Show when="signed-out"><PublicWelcome /></Show>
+  </>;
+}
+
+function ProtectedWorkspace() {
+  return <>
+    <Show when="signed-in"><AppContent /></Show>
+    <Show when="signed-out"><Redirect to="/" /></Show>
+  </>;
+}
+
+function SignInPage() {
+  return <main className="auth-page"><div className="auth-backdrop"><span className="auth-orbit auth-orbit-one" /><span className="auth-orbit auth-orbit-two" /></div>
+    <Link className="auth-back-brand" href="/"><span className="brand-mark"><Command size={18} strokeWidth={2.4} /></span><span>clientflow<span className="brand-period">.</span></span></Link>
+    <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+  </main>;
+}
+
+function SignUpPage() {
+  return <main className="auth-page"><div className="auth-backdrop"><span className="auth-orbit auth-orbit-one" /><span className="auth-orbit auth-orbit-two" /></div>
+    <Link className="auth-back-brand" href="/"><span className="brand-mark"><Command size={18} strokeWidth={2.4} /></span><span>clientflow<span className="brand-period">.</span></span></Link>
+    <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+  </main>;
+}
+
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const queryClient = useQueryClient();
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const unsubscribe = addListener(({ user }) => {
+      const userId = user?.id ?? null;
+      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
+        queryClient.clear();
+      }
+      prevUserIdRef.current = userId;
+    });
+    return unsubscribe;
+  }, [addListener, queryClient]);
+
+  return null;
+}
+
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+
+  return <ClerkProvider
+    publishableKey={clerkPubKey}
+    proxyUrl={clerkProxyUrl}
+    appearance={clerkAppearance}
+    signInUrl={`${basePath}/sign-in`}
+    signUpUrl={`${basePath}/sign-up`}
+    localization={{
+      signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to return to your ClientFlow workspace.' } },
+      signUp: { start: { title: 'Make room for good work', subtitle: 'Create your independent practice workspace.' } },
+    }}
+    routerPush={(to) => setLocation(stripBase(to))}
+    routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+  >
+    <QueryClientProvider client={queryClient}>
+      <ClerkQueryClientCacheInvalidator />
+      <Switch>
+        <Route path="/" component={HomeRoute} />
+        <Route path="/sign-in/*?" component={SignInPage} />
+        <Route path="/sign-up/*?" component={SignUpPage} />
+        <Route path="/clients" component={ProtectedWorkspace} />
+        <Route path="/projects" component={ProtectedWorkspace} />
+        <Route path="/tasks" component={ProtectedWorkspace} />
+        <Route component={NotFound} />
+      </Switch>
+    </QueryClientProvider>
+  </ClerkProvider>;
+}
+
 function Root() {
-  return <QueryClientProvider client={queryClient}><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Switch><Route path="/" component={AppContent} /><Route path="/clients" component={AppContent} /><Route path="/projects" component={AppContent} /><Route path="/tasks" component={AppContent} /><Route component={NotFound} /></Switch></WouterRouter></QueryClientProvider>;
+  return <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>;
 }
 
 export default Root;

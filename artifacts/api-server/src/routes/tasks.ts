@@ -11,6 +11,7 @@ import {
   UpdateTaskResponse,
 } from "@workspace/api-zod";
 import { clientsTable, db, projectsTable, tasksTable } from "@workspace/db";
+import { getAuthUserId } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -28,13 +29,18 @@ const taskSelection = {
 };
 
 router.get("/tasks", async (req, res): Promise<void> => {
+  const ownerId = getAuthUserId(res);
   const parsed = GetTasksQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  const filters = [];
+  const filters = [
+    eq(tasksTable.ownerId, ownerId),
+    eq(projectsTable.ownerId, ownerId),
+    eq(clientsTable.ownerId, ownerId),
+  ];
   if (parsed.data.projectId !== undefined) {
     filters.push(eq(tasksTable.projectId, parsed.data.projectId));
   }
@@ -53,6 +59,7 @@ router.get("/tasks", async (req, res): Promise<void> => {
 });
 
 router.post("/tasks", async (req, res): Promise<void> => {
+  const ownerId = getAuthUserId(res);
   const parsed = CreateTaskBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -62,7 +69,12 @@ router.post("/tasks", async (req, res): Promise<void> => {
   const [project] = await db
     .select({ id: projectsTable.id })
     .from(projectsTable)
-    .where(eq(projectsTable.id, parsed.data.projectId))
+    .where(
+      and(
+        eq(projectsTable.id, parsed.data.projectId),
+        eq(projectsTable.ownerId, ownerId),
+      ),
+    )
     .limit(1);
   if (!project) {
     res.status(400).json({ error: "Select an existing project" });
@@ -78,18 +90,26 @@ router.post("/tasks", async (req, res): Promise<void> => {
   };
   const [created] = await db
     .insert(tasksTable)
-    .values(taskData)
+    .values({ ...taskData, ownerId })
     .returning({ id: tasksTable.id });
   const [task] = await db
     .select(taskSelection)
     .from(tasksTable)
     .innerJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
     .innerJoin(clientsTable, eq(projectsTable.clientId, clientsTable.id))
-    .where(eq(tasksTable.id, created.id));
+    .where(
+      and(
+        eq(tasksTable.id, created.id),
+        eq(tasksTable.ownerId, ownerId),
+        eq(projectsTable.ownerId, ownerId),
+        eq(clientsTable.ownerId, ownerId),
+      ),
+    );
   res.status(201).json(CreateTaskResponse.parse(task));
 });
 
 router.patch("/tasks/:id", async (req, res): Promise<void> => {
+  const ownerId = getAuthUserId(res);
   const params = UpdateTaskParams.safeParse(req.params);
   const body = UpdateTaskBody.safeParse(req.body);
   if (!params.success) {
@@ -105,7 +125,12 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
     const [project] = await db
       .select({ id: projectsTable.id })
       .from(projectsTable)
-      .where(eq(projectsTable.id, body.data.projectId))
+      .where(
+        and(
+          eq(projectsTable.id, body.data.projectId),
+          eq(projectsTable.ownerId, ownerId),
+        ),
+      )
       .limit(1);
     if (!project) {
       res.status(400).json({ error: "Select an existing project" });
@@ -123,7 +148,12 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
   const [updated] = await db
     .update(tasksTable)
     .set(updateData)
-    .where(eq(tasksTable.id, params.data.id))
+    .where(
+      and(
+        eq(tasksTable.id, params.data.id),
+        eq(tasksTable.ownerId, ownerId),
+      ),
+    )
     .returning({ id: tasksTable.id });
   if (!updated) {
     res.status(404).json({ error: "Task not found" });
@@ -135,11 +165,19 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
     .from(tasksTable)
     .innerJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
     .innerJoin(clientsTable, eq(projectsTable.clientId, clientsTable.id))
-    .where(eq(tasksTable.id, params.data.id));
+    .where(
+      and(
+        eq(tasksTable.id, params.data.id),
+        eq(tasksTable.ownerId, ownerId),
+        eq(projectsTable.ownerId, ownerId),
+        eq(clientsTable.ownerId, ownerId),
+      ),
+    );
   res.json(UpdateTaskResponse.parse(task));
 });
 
 router.delete("/tasks/:id", async (req, res): Promise<void> => {
+  const ownerId = getAuthUserId(res);
   const params = DeleteTaskParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -148,7 +186,12 @@ router.delete("/tasks/:id", async (req, res): Promise<void> => {
 
   const [task] = await db
     .delete(tasksTable)
-    .where(eq(tasksTable.id, params.data.id))
+    .where(
+      and(
+        eq(tasksTable.id, params.data.id),
+        eq(tasksTable.ownerId, ownerId),
+      ),
+    )
     .returning({ id: tasksTable.id });
   if (!task) {
     res.status(404).json({ error: "Task not found" });
