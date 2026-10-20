@@ -66,6 +66,7 @@ describe("API authentication and per-user authorization", () => {
     await request(app).get("/api/healthz").expect(200);
 
     await api.get(null, "/api/dashboard").expect(401);
+    await api.get(null, "/api/auth/me").expect(401);
     await api.get(null, "/api/clients").expect(401);
     await api.get(null, "/api/projects").expect(401);
     await api.get(null, "/api/tasks").expect(401);
@@ -81,6 +82,10 @@ describe("API authentication and per-user authorization", () => {
   });
 
   it("isolates clients, projects, tasks, and dashboard totals between users", async () => {
+    const identity = await api.get(ownerA, "/api/auth/me").expect(200);
+    expect(identity.body).toEqual({ userId: ownerA });
+    expect(identity.headers["cache-control"]).toBe("no-store");
+
     const clientResponse = await api
       .post(ownerA, "/api/clients", { name: `${fixtureTag}-client` })
       .expect(201);
