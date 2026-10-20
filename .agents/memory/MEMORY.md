@@ -1,1 +1,2 @@
 - [ClientFlow product scope](clientflow-product-scope.md) — freelancer workspace for clients, projects, and tasks; keep the MVP task lifecycle focused on To Do, In Progress, and Done.
+- [ClientFlow ownership mapping](clientflow-ownership-mapping.md) — preserve legacy rows as unassigned until the user explicitly maps them; avoid truncating schema-push paths.

@@ -8,7 +8,7 @@ import {
   serial,
   text,
   timestamp,
-  unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { projectsTable } from "./projects";
 
@@ -40,7 +40,7 @@ export const tasksTable = pgTable("tasks", {
     .defaultNow(),
 }, (table) => ({
   ownerIdIndex: index("tasks_owner_id_idx").on(table.ownerId),
-  ownerIdIdUnique: unique("tasks_owner_id_id_unique").on(
+  ownerIdIdUnique: uniqueIndex("tasks_owner_id_id_unique").on(
     table.ownerId,
     table.id,
   ),
