@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import {
   clientsTable,
   db,
@@ -25,10 +25,12 @@ import app from "./app";
 const fixtureTag = `authz-${randomUUID()}`;
 const ownerA = `${fixtureTag}-owner-a`;
 const ownerB = `${fixtureTag}-owner-b`;
+const testOwners = [ownerA, ownerB];
 const sameOriginHeaders = {
   Host: "clientflow.test",
   Origin: "http://clientflow.test",
 };
+let fixtureNamespaceIsClean = false;
 
 const api = {
   get(userId: string | null, path: string) {
@@ -49,15 +51,69 @@ const api = {
   },
 };
 
+beforeAll(async () => {
+  const [existingClientByOwner, existingProjectByOwner, existingTaskByOwner] =
+    await Promise.all([
+      db
+        .select({ id: clientsTable.id })
+        .from(clientsTable)
+        .where(inArray(clientsTable.ownerId, testOwners))
+        .limit(1),
+      db
+        .select({ id: projectsTable.id })
+        .from(projectsTable)
+        .where(inArray(projectsTable.ownerId, testOwners))
+        .limit(1),
+      db
+        .select({ id: tasksTable.id })
+        .from(tasksTable)
+        .where(inArray(tasksTable.ownerId, testOwners))
+        .limit(1),
+    ]);
+  const [existingClientByTag, existingProjectByTag, existingTaskByTag] =
+    await Promise.all([
+      db
+        .select({ id: clientsTable.id })
+        .from(clientsTable)
+        .where(like(clientsTable.name, `${fixtureTag}%`))
+        .limit(1),
+      db
+        .select({ id: projectsTable.id })
+        .from(projectsTable)
+        .where(like(projectsTable.name, `${fixtureTag}%`))
+        .limit(1),
+      db
+        .select({ id: tasksTable.id })
+        .from(tasksTable)
+        .where(like(tasksTable.title, `${fixtureTag}%`))
+        .limit(1),
+    ]);
+
+  if (
+    existingClientByOwner.length ||
+    existingProjectByOwner.length ||
+    existingTaskByOwner.length ||
+    existingClientByTag.length ||
+    existingProjectByTag.length ||
+    existingTaskByTag.length
+  ) {
+    throw new Error("Refusing to run authorization tests in a non-empty fixture namespace");
+  }
+  fixtureNamespaceIsClean = true;
+});
+
 afterAll(async () => {
-  const testOwners = [ownerA, ownerB];
-  await db.delete(tasksTable).where(inArray(tasksTable.ownerId, testOwners));
-  await db
-    .delete(projectsTable)
-    .where(inArray(projectsTable.ownerId, testOwners));
-  await db
-    .delete(clientsTable)
-    .where(inArray(clientsTable.ownerId, testOwners));
+  if (fixtureNamespaceIsClean) {
+    await db
+      .delete(tasksTable)
+      .where(like(tasksTable.title, `${fixtureTag}%`));
+    await db
+      .delete(projectsTable)
+      .where(like(projectsTable.name, `${fixtureTag}%`));
+    await db
+      .delete(clientsTable)
+      .where(like(clientsTable.name, `${fixtureTag}%`));
+  }
   await pool.end();
 });
 
@@ -107,36 +163,75 @@ describe("API authentication and per-user authorization", () => {
       .expect(201);
     const taskId = taskResponse.body.id as number;
 
+    const ownerBClientResponse = await api
+      .post(ownerB, "/api/clients", { name: `${fixtureTag}-owner-b-client` })
+      .expect(201);
+    const ownerBClientId = ownerBClientResponse.body.id as number;
+
+    const ownerBProjectResponse = await api
+      .post(ownerB, "/api/projects", {
+        name: `${fixtureTag}-owner-b-project`,
+        clientId: ownerBClientId,
+      })
+      .expect(201);
+    const ownerBProjectId = ownerBProjectResponse.body.id as number;
+
+    const ownerBTaskResponse = await api
+      .post(ownerB, "/api/tasks", {
+        title: `${fixtureTag}-owner-b-task`,
+        projectId: ownerBProjectId,
+      })
+      .expect(201);
+    const ownerBTaskId = ownerBTaskResponse.body.id as number;
+
     expect(
       (await api.get(ownerA, "/api/clients").expect(200)).body.map(
         (client: { id: number }) => client.id,
       ),
-    ).toContain(clientId);
+    ).toEqual([clientId]);
     expect(
       (await api.get(ownerA, "/api/projects").expect(200)).body.map(
         (project: { id: number }) => project.id,
       ),
-    ).toContain(projectId);
+    ).toEqual([projectId]);
     expect(
       (await api.get(ownerA, "/api/tasks").expect(200)).body.map(
         (task: { id: number }) => task.id,
       ),
-    ).toContain(taskId);
+    ).toEqual([taskId]);
 
-    expect((await api.get(ownerB, "/api/clients").expect(200)).body).toEqual([]);
-    expect((await api.get(ownerB, "/api/projects").expect(200)).body).toEqual([]);
-    expect((await api.get(ownerB, "/api/tasks").expect(200)).body).toEqual([]);
+    expect(
+      (await api.get(ownerB, "/api/clients").expect(200)).body.map(
+        (client: { id: number }) => client.id,
+      ),
+    ).toEqual([ownerBClientId]);
+    expect(
+      (await api.get(ownerB, "/api/projects").expect(200)).body.map(
+        (project: { id: number }) => project.id,
+      ),
+    ).toEqual([ownerBProjectId]);
+    expect(
+      (await api.get(ownerB, "/api/tasks").expect(200)).body.map(
+        (task: { id: number }) => task.id,
+      ),
+    ).toEqual([ownerBTaskId]);
+
+    await api.get(ownerB, `/api/clients/${clientId}`).expect(404);
+    await api.get(ownerB, `/api/projects/${projectId}`).expect(404);
+    await api.get(ownerB, `/api/tasks/${taskId}`).expect(404);
 
     const otherDashboard = (await api.get(ownerB, "/api/dashboard").expect(200))
       .body;
-    expect(otherDashboard.clientCount).toBe(0);
-    expect(otherDashboard.projectCount).toBe(0);
-    expect(otherDashboard.activeProjectCount).toBe(0);
-    expect(otherDashboard.taskCounts).toEqual({
-      todo: 0,
-      in_progress: 0,
-      done: 0,
-    });
+    expect(otherDashboard.clientCount).toBe(1);
+    expect(otherDashboard.projectCount).toBe(1);
+    expect(otherDashboard.activeProjectCount).toBe(
+      ownerBProjectResponse.body.status === "active" ? 1 : 0,
+    );
+    const taskCounts = otherDashboard.taskCounts as Record<string, number>;
+    expect(taskCounts[ownerBTaskResponse.body.status]).toBe(1);
+    expect(
+      Object.values(taskCounts).reduce((total, count) => total + count, 0),
+    ).toBe(1);
 
     await api
       .post(ownerB, "/api/projects", {
@@ -145,10 +240,16 @@ describe("API authentication and per-user authorization", () => {
       })
       .expect(400);
     await api
+      .patch(ownerB, `/api/projects/${ownerBProjectId}`, { clientId })
+      .expect(400);
+    await api
       .post(ownerB, "/api/tasks", {
         title: `${fixtureTag}-foreign-task`,
         projectId,
       })
+      .expect(400);
+    await api
+      .patch(ownerB, `/api/tasks/${ownerBTaskId}`, { projectId })
       .expect(400);
 
     await api
@@ -171,6 +272,77 @@ describe("API authentication and per-user authorization", () => {
     expect(storedClient).toEqual({
       ownerId: ownerA,
       name: `${fixtureTag}-client`,
+    });
+
+    const [storedProject] = await db
+      .select({
+        ownerId: projectsTable.ownerId,
+        name: projectsTable.name,
+        clientId: projectsTable.clientId,
+      })
+      .from(projectsTable)
+      .where(
+        and(
+          eq(projectsTable.id, projectId),
+          eq(projectsTable.ownerId, ownerA),
+        ),
+      );
+    expect(storedProject).toEqual({
+      ownerId: ownerA,
+      name: `${fixtureTag}-project`,
+      clientId,
+    });
+
+    const [storedTask] = await db
+      .select({
+        ownerId: tasksTable.ownerId,
+        title: tasksTable.title,
+        projectId: tasksTable.projectId,
+      })
+      .from(tasksTable)
+      .where(and(eq(tasksTable.id, taskId), eq(tasksTable.ownerId, ownerA)));
+    expect(storedTask).toEqual({
+      ownerId: ownerA,
+      title: `${fixtureTag}-task`,
+      projectId,
+    });
+
+    const [storedOwnerBProject] = await db
+      .select({
+        ownerId: projectsTable.ownerId,
+        name: projectsTable.name,
+        clientId: projectsTable.clientId,
+      })
+      .from(projectsTable)
+      .where(
+        and(
+          eq(projectsTable.id, ownerBProjectId),
+          eq(projectsTable.ownerId, ownerB),
+        ),
+      );
+    expect(storedOwnerBProject).toEqual({
+      ownerId: ownerB,
+      name: `${fixtureTag}-owner-b-project`,
+      clientId: ownerBClientId,
+    });
+
+    const [storedOwnerBTask] = await db
+      .select({
+        ownerId: tasksTable.ownerId,
+        title: tasksTable.title,
+        projectId: tasksTable.projectId,
+      })
+      .from(tasksTable)
+      .where(
+        and(
+          eq(tasksTable.id, ownerBTaskId),
+          eq(tasksTable.ownerId, ownerB),
+        ),
+      );
+    expect(storedOwnerBTask).toEqual({
+      ownerId: ownerB,
+      title: `${fixtureTag}-owner-b-task`,
+      projectId: ownerBProjectId,
     });
   });
 
