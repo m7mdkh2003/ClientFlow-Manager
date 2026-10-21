@@ -34,7 +34,7 @@ A full-stack web application designed to help freelancers manage their clients, 
 
 Manage client information and keep all relationships organized.
 
-![ClientFlow Clients](./clientflow-clients.png)
+![ClientFlow Clients](./clientflow-clints.png)
 
 ### Project Management
 
