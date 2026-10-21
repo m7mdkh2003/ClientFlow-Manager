@@ -23,6 +23,12 @@ A full-stack web application designed to help freelancers manage their clients, 
 - Protected API endpoints
 - User-specific workspaces
 - Database persistence
+- 
+- ## Application Screenshots
+
+### Dashboard
+
+![ClientFlow Dashboard](./ClientFlow_Dashboard_Ready.png)
 
 ## Security
 
