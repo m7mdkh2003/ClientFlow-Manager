@@ -30,6 +30,25 @@ A full-stack web application designed to help freelancers manage their clients, 
 
 ![ClientFlow Dashboard](./ClientFlow_Dashboard_Ready.png)
 
+### Client Management
+
+Manage client information and keep all relationships organized.
+
+![ClientFlow Clients](./clientflow-clients.png)
+
+### Project Management
+
+Track projects, deadlines, statuses, and associated clients.
+
+![ClientFlow Projects](./clientflow-projects.png)
+
+### Task Management
+
+Organize tasks by priority and progress using To Do, In Progress, and Done.
+
+![ClientFlow Tasks](./clientflow-tasks.png)
+
+
 ## Security
 
 ClientFlow uses Clerk authentication and server-side authorization checks to protect user data.
