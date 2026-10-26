@@ -1,20 +1,17 @@
+import {
+  CreateProjectInput,
+  UpdateProjectInput,
+} from "../lib/request-validation";
 import { Router, type IRouter } from "express";
 import { and, eq } from "drizzle-orm";
 import {
-  CreateProjectBody,
   CreateProjectResponse,
   DeleteProjectParams,
   GetProjectsResponse,
-  UpdateProjectBody,
   UpdateProjectParams,
   UpdateProjectResponse,
 } from "@workspace/api-zod";
-import {
-  clientsTable,
-  db,
-  projectsTable,
-  tasksTable,
-} from "@workspace/db";
+import { clientsTable, db, projectsTable, tasksTable } from "@workspace/db";
 import { getAuthUserId } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -48,7 +45,7 @@ router.get("/projects", async (_req, res): Promise<void> => {
 
 router.post("/projects", async (req, res): Promise<void> => {
   const ownerId = getAuthUserId(res);
-  const parsed = CreateProjectBody.safeParse(req.body);
+  const parsed = CreateProjectInput.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
@@ -97,7 +94,7 @@ router.post("/projects", async (req, res): Promise<void> => {
 router.patch("/projects/:id", async (req, res): Promise<void> => {
   const ownerId = getAuthUserId(res);
   const params = UpdateProjectParams.safeParse(req.params);
-  const body = UpdateProjectBody.safeParse(req.body);
+  const body = UpdateProjectInput.safeParse(req.body);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -179,7 +176,9 @@ router.delete("/projects/:id", async (req, res): Promise<void> => {
     )
     .limit(1);
   if (task) {
-    res.status(409).json({ error: "Move or delete this project's tasks first" });
+    res
+      .status(409)
+      .json({ error: "Move or delete this project's tasks first" });
     return;
   }
 

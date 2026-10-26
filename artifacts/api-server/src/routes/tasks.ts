@@ -1,12 +1,11 @@
+import { CreateTaskInput, UpdateTaskInput } from "../lib/request-validation";
 import { Router, type IRouter } from "express";
 import { and, asc, eq } from "drizzle-orm";
 import {
-  CreateTaskBody,
   CreateTaskResponse,
   DeleteTaskParams,
   GetTasksQueryParams,
   GetTasksResponse,
-  UpdateTaskBody,
   UpdateTaskParams,
   UpdateTaskResponse,
 } from "@workspace/api-zod";
@@ -60,7 +59,7 @@ router.get("/tasks", async (req, res): Promise<void> => {
 
 router.post("/tasks", async (req, res): Promise<void> => {
   const ownerId = getAuthUserId(res);
-  const parsed = CreateTaskBody.safeParse(req.body);
+  const parsed = CreateTaskInput.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
@@ -111,7 +110,7 @@ router.post("/tasks", async (req, res): Promise<void> => {
 router.patch("/tasks/:id", async (req, res): Promise<void> => {
   const ownerId = getAuthUserId(res);
   const params = UpdateTaskParams.safeParse(req.params);
-  const body = UpdateTaskBody.safeParse(req.body);
+  const body = UpdateTaskInput.safeParse(req.body);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -149,10 +148,7 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
     .update(tasksTable)
     .set(updateData)
     .where(
-      and(
-        eq(tasksTable.id, params.data.id),
-        eq(tasksTable.ownerId, ownerId),
-      ),
+      and(eq(tasksTable.id, params.data.id), eq(tasksTable.ownerId, ownerId)),
     )
     .returning({ id: tasksTable.id });
   if (!updated) {
@@ -187,10 +183,7 @@ router.delete("/tasks/:id", async (req, res): Promise<void> => {
   const [task] = await db
     .delete(tasksTable)
     .where(
-      and(
-        eq(tasksTable.id, params.data.id),
-        eq(tasksTable.ownerId, ownerId),
-      ),
+      and(eq(tasksTable.id, params.data.id), eq(tasksTable.ownerId, ownerId)),
     )
     .returning({ id: tasksTable.id });
   if (!task) {
