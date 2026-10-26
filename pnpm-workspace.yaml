@@ -94,7 +94,7 @@ overrides:
   lightningcss>lightningcss-linux-arm64-musl: '-'
   lightningcss>lightningcss-linux-x64-musl: '-'
   lightningcss>lightningcss-win32-arm64-msvc: '-'
-    lightningcss>lightningcss-win32-x64-msvc: '-'
+  lightningcss>lightningcss-win32-x64-msvc: '-'
   postcss-selector-parser@<7.1.6: '>=7.1.6'
   proxy-addr: 2.0.8
   rollup>@rollup/rollup-android-arm-eabi: '-'
